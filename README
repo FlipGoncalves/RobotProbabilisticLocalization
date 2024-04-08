@@ -1,0 +1,18 @@
+Generate_data_EKF_localization_v3.m
+  Script to generate data to simulate the EKF
+  Needs to be called only to create the data
+
+ekf.m
+  The function that implements the actual Extended Kalman Filter
+  Requires auxiliary functions yet to develop, such as:
+  motionmodel()
+  sensormodel()
+
+Robot_Localization_EKF_Landmark_v3.m
+  Example script to perform localization using EKF
+  Prepares all the data and initializations, and runs the EKF
+  It also plots some information (true and estimated positions and error ellipses)
+
+
+vsantos, March 2024
+
