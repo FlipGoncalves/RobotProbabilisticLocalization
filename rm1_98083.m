@@ -42,7 +42,6 @@ function rm1_98083(N, Dt, r, L, Vn, Wn, V)
     % V - desired average linear velocity along trajectory (5 m/s)
     
     close all
-    clear
     clc
 
     % In case nothing is passed by in the function arguments
@@ -58,7 +57,8 @@ function rm1_98083(N, Dt, r, L, Vn, Wn, V)
     end
     if nargin < 4
         L = 1;
-    end    if nargin < 5
+    end
+    if nargin < 5
         Vn = 0.1;
     end
     if nargin < 6
@@ -79,25 +79,42 @@ function rm1_98083(N, Dt, r, L, Vn, Wn, V)
     landmarkxy = zeros(N, 5);
     X = vertcat(B.X);
     Y = vertcat(B.Y);
-    d = vertcat(B.d);
     a = vertcat(B.a);
-    control_input_true = [];
-    th = 0;
     P = [0 0];
+    traj_pos_x = [0];
+    traj_pos_y_straight = [0];
     for i=1:N
         distance = sqrt(power(X(i) - P(1), 2) + power(Y(i) - P(2), 2));
         landmarkxy(i,:) = [i, X(i), Y(i), distance, a(i)];
         n_steps = round(distance / V / Dt, TieBreaker="tozero") + 1;
-        for step=1:n_steps
-            if step == 1
-                temp = th;
-                th = atan2(Y(i) - P(2), X(i) - P(1));
-                control_input_true = [control_input_true; 1 0 th - temp];
-            else
-                control_input_true = [control_input_true; 1 V*Dt 0];
-            end
-        end
+        lins = linspace(P(1), X(i), n_steps);
+        lins_straight = linspace(P(2), Y(i), n_steps);
+        traj_pos_x = [traj_pos_x lins(2:end)];
+        traj_pos_y_straight = [traj_pos_y_straight lins_straight(2:end)];
         P = [X(i) Y(i)];
+    end
+
+    landmarks_x = [0; landmarkxy(:,2)];
+    landmarks_y = [0; landmarkxy(:,3)];
+    traj_pos_y = pchip(landmarks_x, landmarks_y, traj_pos_x);
+
+    th = 0;
+    control_input_true = [];
+    for step=1:size(traj_pos_y, 2)-1
+        x = traj_pos_x(step);
+        y = traj_pos_y(step);
+
+        x_next = traj_pos_x(step+1);
+        y_next = traj_pos_y(step+1);
+        
+        temp = th;
+        th = atan2(y_next - y, x_next - x);
+        % new_th = th - temp;
+
+        [VR, VL] = invkinDD(x, y, th, L, Dt);
+        [Vx, Vy, w] = localvels(1, r, L, VR, VL, 0)
+
+        control_input_true = [control_input_true; i Vx w];
     end
 
     % number of motion steps (starts from time step 0)
@@ -187,15 +204,36 @@ function rm1_98083(N, Dt, r, L, Vn, Wn, V)
     
     % draw the estimated robot poses and uncertainty ellipses
     figure(1)
-    arrow_length=0.3;
-    
+    subplot(2,1,1);
     axis([-1 max(landmarkxy(:,2))+20 -1 max(landmarkxy(:,3))+20])
     hold on
+    plot(traj_pos_x,traj_pos_y_straight,'LineWidth',2, 'Color', 'r', 'LineStyle', '--')
+    plot(landmarkxy(:,2),landmarkxy(:,3),'k*','MarkerSize',8);
+    text(landmarkxy(:,2)+0.2,landmarkxy(:,3),num2str(landmarkxy(:,1)),'fontweight','bold','fontsize',14)
+    title("Beacons and the linearised path")
+    grid on
+
+    subplot(2,1,2);
+    axis([-1 max(landmarkxy(:,2))+20 -1 max(landmarkxy(:,3))+20])
+    hold on
+    plot(traj_pos_x,traj_pos_y,'LineWidth',2, 'Color', 'g')
+    plot(landmarkxy(:,2),landmarkxy(:,3),'bo','MarkerSize',8);
+    text(landmarkxy(:,2)+0.2,landmarkxy(:,3),num2str(landmarkxy(:,1)),'fontweight','bold','fontsize',14)
+    for i = 1:numel(traj_pos_x)
+        plot([traj_pos_x(i), traj_pos_x(i)], [0, traj_pos_y(i)], '--k'); % Plot a dashed black line from each point to the x-axis
+    end
+    title("V = "+ V +" m/s ; Dt = "+Dt+" s ; Dd = "+V*Dt+" m", "Path by Hermite polynomial interpolation (pchip)")
+    grid on
+    
+    figure(2)
+    hold on
+    grid on
+    axis([-1 max(landmarkxy(:,2))+20 -1 max(landmarkxy(:,3))+20])
     
     plot(landmarkxy(:,2),landmarkxy(:,3),'k*','MarkerSize',14);
     text(landmarkxy(:,2)+0.2,landmarkxy(:,3),num2str(landmarkxy(:,1)),'fontweight','bold','fontsize',14)
-    grid on
-    
+
+    arrow_length=0.3;
     for i=0:num_steps
         uncer_p = P_EKF(i*3+1:i*3+2, 1:2);            % get the xy covariance
         
@@ -212,7 +250,7 @@ function rm1_98083(N, Dt, r, L, Vn, Wn, V)
         quiver(xstate_EKF(i+1,2),xstate_EKF(i+1,3), dx, dy, 0, 'Color', 'b','linewidth',1.2)
         
         % draw the true robot poses for comparison
-        plot(xstate_true(i+1,2),xstate_true(i+1,3),'ro','linewidth',2);
+        plot(xstate_true(i+1,2),xstate_true(i+1,3),'ro','linewidth',1);
         
         dx = arrow_length*cos(xstate_true(i+1,4));
         dy = arrow_length*sin(xstate_true(i+1,4));
