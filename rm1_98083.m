@@ -107,14 +107,25 @@ function rm1_98083(N, Dt, r, L, Vn, Wn, V)
         x_next = traj_pos_x(step+1);
         y_next = traj_pos_y(step+1);
         
-        temp = th;
+        temp_th = th;
         th = atan2(y_next - y, x_next - x);
-        % new_th = th - temp;
+        new_th = th - temp_th;
 
-        [VR, VL] = invkinDD(x, y, th, L, Dt);
-        [Vx, Vy, w] = localvels(1, r, L, VR, VL, 0)
-
-        control_input_true = [control_input_true; i Vx w];
+        X = x_next - x;
+        Y = y_next - y;
+    
+        % Angular Movement
+        control_input_true = [control_input_true; i 0 new_th];
+    
+        % Linear Movement
+        [VR, VL] = invkinDDxy(X, Y, L, Dt, 0, 0);
+        w1 = VR/r;
+        aw2 = VL/r;
+        w3 = 0;
+        [Vx, Vy, w] = localvels(1, r, L, aw2, w1, w3);
+        R = orm(new_th);
+        W = inv(R) * [Vx Vy w]';
+        control_input_true = [control_input_true; i W(1)*cos(new_th) + W(2)*sin(new_th) 0];
     end
 
     % number of motion steps (starts from time step 0)
