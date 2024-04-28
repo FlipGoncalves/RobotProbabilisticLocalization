@@ -168,8 +168,8 @@ function rm1_98083(N, Dt, r, L, Vn, Wn, V)
                 aw2 = VR/r;                                 % calculate angular velocity of right wheel
             % TRI mobile robot
             else                
-                w1 = V*cos(new_th)/r;                       % calculate angular velocity of steering wheel
-                aw2 = new_th;                               % calculate alpha
+                w1 = V * cos(new_th) / r - sin(new_th);         % calculate angular velocity of steering wheel
+                aw2 = new_th / L;                               % calculate alpha
             end
     
             % calculate x and y velocities for the mobile robot
